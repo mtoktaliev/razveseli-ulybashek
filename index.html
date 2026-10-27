@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#c7f0ff">
+<title>Развесели улыбашек</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: "Comic Sans MS", system-ui, -apple-system, sans-serif; -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
+  body { position: fixed; inset: 0; background: linear-gradient(135deg, #c7f0ff, #d9c7ff, #ffd1e8); background-size: 300% 300%; animation: bg 10s ease infinite; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  @keyframes bg { 50% { background-position: 100% 100%; } }
+
+  #hud { position: fixed; top: 0; left: 0; right: 0; text-align: center; padding: 10px; padding-top: calc(10px + env(safe-area-inset-top)); z-index: 10; color: #2d4a7a; text-shadow: 0 2px #fff8; pointer-events: none; }
+  #hud h1 { margin: 0; font-size: 28px; }
+  #hud p { margin: 4px 0 0; font-size: 16px; }
+  @media (max-width: 600px) { #hud h1 { font-size: 22px; } #hud p { font-size: 14px; } }
+
+  #field { position: fixed; left: 0; right: 0; bottom: env(safe-area-inset-bottom); top: calc(82px + env(safe-area-inset-top)); }
+  @media (max-width: 600px) { #field { top: calc(72px + env(safe-area-inset-top)); } }
+
+  /* one smile = one button, placed by percentage so it survives resizing / rotating */
+  .smile { position: absolute; width: var(--s, 90px); height: var(--s, 90px); margin: calc(var(--s, 90px) / -2) 0 0 calc(var(--s, 90px) / -2); padding: 0; border: 0; background: none; cursor: pointer; font: inherit; -webkit-tap-highlight-color: transparent; animation: appear .5s cubic-bezier(.3, 1.6, .5, 1) backwards; }
+  .smile:disabled { cursor: default; }
+  @keyframes appear { from { transform: scale(0); } }
+  .face { position: relative; width: 100%; height: 100%; display: block; transform-origin: 50% 90%; filter: drop-shadow(0 4px 5px #0003); }
+  .photo { width: 100%; height: 100%; display: block; box-sizing: border-box; border-radius: 50%; object-fit: cover; border: 4px solid var(--ring, #7fa6d6); pointer-events: none; -webkit-user-drag: none; transition: filter .3s, border-color .3s; }
+  .tears { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+  .smile[data-mood="0"] .photo { filter: grayscale(1) sepia(.5) hue-rotate(180deg) saturate(1.8) brightness(.85); }
+  .smile[data-mood="1"] .photo { filter: grayscale(.7) sepia(.3) hue-rotate(180deg) saturate(1.3) brightness(.92); }
+  .smile[data-mood="2"] .photo { filter: grayscale(.3); }
+  .smile[data-mood="3"] .photo { filter: saturate(1.25) brightness(1.06); }
+  .smile[data-mood="0"] .face { animation: sob 1.1s ease-in-out infinite; }
+  .smile[data-mood="1"] .face { animation: sob 1.8s ease-in-out infinite; }
+  .smile[data-mood="2"] .face { animation: sway 2.6s ease-in-out infinite; }
+  .smile[data-mood="3"] .face { animation: joy .6s ease-in-out infinite; }
+  @keyframes sob { 0%, 100% { transform: translateY(0) scale(1, 1); } 50% { transform: translateY(3%) scale(1.04, .95); } }
+  @keyframes sway { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+  @keyframes joy { 0%, 100% { transform: translateY(0) rotate(-8deg); } 50% { transform: translateY(-14%) rotate(8deg) scale(1.08); } }
+
+  .smile.hit .face { animation: smack .45s ease-out; }
+  @keyframes smack {
+    0% { transform: translateX(0) scale(1); }
+    15% { transform: translateX(-26%) rotate(-14deg) scale(.8, 1.12); }
+    35% { transform: translateX(10%) rotate(8deg) scale(1.1, .9); }
+    60% { transform: translateX(-4%) rotate(-3deg); }
+    100% { transform: translateX(0) rotate(0); }
+  }
+
+  .tear { fill: #bfe3ff; stroke: #3d8fd8; stroke-width: 1.5; opacity: 0; animation: drip 1.1s ease-in infinite; }
+  .tear.b { animation-delay: .5s; }
+  .smile[data-mood="1"] .tear { animation-duration: 1.9s; }
+  .smile[data-mood="2"] .tear, .smile[data-mood="3"] .tear { display: none; }
+  @keyframes drip { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(46px); opacity: 0; } }
+
+  /* boxing glove that replaces the mouse pointer; its knuckles sit on the pointer */
+  @media (hover: hover) and (pointer: fine) { html, body, button { cursor: none !important; } }
+  #glove { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none; font-size: 64px; line-height: 1; opacity: 0; transition: opacity .15s; will-change: transform; }
+  #glove.on { opacity: 1; }
+  #glove span { display: block; transform: translate(-12%, -50%); transform-origin: 20% 50%; }
+  #glove.jab span { animation: jab .32s ease-out; }
+  @keyframes jab {
+    0% { transform: translate(-12%, -50%); }
+    30% { transform: translate(30%, -50%) rotate(8deg) scale(.95); }
+    55% { transform: translate(-40%, -50%) rotate(-6deg) scale(1.25); }
+    100% { transform: translate(-12%, -50%); }
+  }
+  @media (max-width: 600px) { #glove { font-size: 52px; } }
+  .burst { position: absolute; left: 30%; top: 25%; font-size: calc(var(--s, 90px) * .4); opacity: 0; pointer-events: none; z-index: 3; }
+  .smile.hit .burst { animation: burst .45s ease-out; }
+  @keyframes burst { 20% { opacity: 1; } 100% { opacity: 0; transform: scale(1.7); } }
+
+  .say { position: absolute; left: 50%; bottom: 96%; transform: translateX(-50%); width: max-content; max-width: 130px; white-space: normal; line-height: 1.2; font-size: 13px; background: #fff; color: #2d4a7a; padding: 3px 9px; border-radius: 12px; box-shadow: 0 2px 6px #0003; pointer-events: none; animation: pop 2.4s ease-in-out infinite; }
+  .say::after { content: ""; position: absolute; left: 50%; top: 100%; margin-left: -6px; border: 6px solid transparent; border-top-color: #fff; }
+  .smile[data-mood="3"] .say { background: #fff3b0; animation: none; opacity: 1; }
+  @keyframes pop { 0%, 100% { opacity: 0; transform: translateX(-50%) scale(.7); } 15%, 75% { opacity: 1; transform: translateX(-50%) scale(1); } }
+
+  .pips { position: absolute; left: 0; right: 0; top: 100%; display: flex; justify-content: center; gap: 4px; pointer-events: none; }
+  .pips i { width: 9px; height: 9px; border-radius: 50%; background: #fff9; border: 1px solid #2d4a7a44; }
+  .pips i.on { background: #ffd23f; border-color: #c99700; }
+
+  .tally { position: absolute; left: 50%; top: calc(100% + 13px); transform: translateX(-50%); white-space: nowrap; font-size: 12px; color: #2d4a7a; background: #fffc; padding: 1px 8px; border-radius: 10px; pointer-events: none; }
+  .tally:empty { display: none; }
+  .tally.bump { animation: bump .3s ease-out; }
+  @keyframes bump { 40% { transform: translateX(-50%) scale(1.35); } }
+
+  #statsBtn { position: fixed; left: calc(10px + env(safe-area-inset-left)); bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 10; font: inherit; font-size: 14px; padding: 8px 14px; border: 0; border-radius: 16px; background: #fffb; color: #2d4a7a; }
+  #stats { position: fixed; inset: 0; z-index: 25; display: none; align-items: center; justify-content: center; background: #2d4a7a55; padding: 16px; padding-top: calc(16px + env(safe-area-inset-top)); padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+  #stats.open { display: flex; }
+  #stats .box { background: #fff; color: #2d4a7a; border-radius: 20px; width: min(420px, 100%); max-height: 100%; display: flex; flex-direction: column; box-shadow: 0 10px 30px #0003; }
+  #stats h3 { margin: 0; padding: 16px 18px 6px; font-size: 22px; }
+  #stats .note { margin: 0; padding: 0 18px 8px; font-size: 13px; opacity: .75; }
+  #stats ol { list-style: none; margin: 0; padding: 0 12px; overflow-y: auto; }
+  #stats li { display: flex; align-items: center; gap: 10px; padding: 6px; border-bottom: 1px solid #2d4a7a18; }
+  #stats li img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
+  #stats li .n { margin-left: auto; font-weight: bold; font-size: 18px; }
+  #stats li .place { width: 28px; text-align: center; font-weight: bold; }
+  #stats .close { margin: 12px auto 16px; font: inherit; font-size: 16px; padding: 8px 22px; border: 0; border-radius: 16px; background: #ffb400; color: #fff; }
+
+  .heart { position: absolute; pointer-events: none; z-index: 5; animation: rise linear forwards; }
+  @keyframes rise { from { transform: translateY(0) scale(.6); opacity: 1; } to { transform: translateY(-220px) scale(1.4) rotate(20deg); opacity: 0; } }
+
+  #win { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: #fff8; z-index: 20; color: #2d4a7a; text-align: center; padding: 20px; }
+  #win h2 { font-size: 44px; margin: 0; animation: joy .8s infinite; }
+  #win p { font-size: 20px; margin: 10px 0 0; }
+  #win button { margin-top: 18px; font: inherit; font-size: 20px; padding: 12px 28px; border: 0; border-radius: 22px; background: #ffb400; color: #fff; cursor: pointer; box-shadow: 0 4px 0 #c98700; }
+  #restart { position: fixed; right: calc(10px + env(safe-area-inset-right)); bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 10; font: inherit; font-size: 14px; padding: 8px 14px; border: 0; border-radius: 16px; background: #fffb; color: #2d4a7a; cursor: pointer; }
+
+  @media (prefers-reduced-motion: reduce) { .face, .tear, .say { animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="hud">
+  <h1>😢 Развесели улыбашек 😄</h1>
+  <p>Ударь каждого 3 раза! Счастливы: <b id="count">0</b> / <b id="total"></b></p>
+</div>
+<div id="field"></div>
+<button id="restart" type="button">Новый раунд</button>
+<button id="statsBtn" type="button">🏆 Рейтинг</button>
+<div id="stats" role="dialog" aria-label="Рейтинг ударов"><div class="box">
+  <h3>🏆 Удары за всё время</h3>
+  <p class="note" id="statsNote"></p>
+  <ol id="statsList"></ol>
+  <button class="close" type="button" id="statsClose">Закрыть</button>
+</div></div>
+<div id="glove" aria-hidden="true"><span>🥊</span></div>
+<div id="win"><h2>🎉 Все улыбаются! 🎉</h2><p id="winText"></p><button id="again" type="button">Играть ещё</button></div>
+
+<script>
+(() => {
+  'use strict';
+
+  // Adjust these constants to customize the game.
+  const MIN_SMILES = 5, MAX_SMILES = 12, HITS_TO_CHEER = 3, HIT_MS = 450;
+  const FACE_COLORS = ['#7fa6d6', '#a2b9c4', '#cfd08a', '#ffd23f'];
+  // Photos of the people, cropped to the face (one per person, no repeats in a round).
+  // To add someone: put a square photo in faces/ and add a line here with a new id.
+  const FACES = [
+    { id: 'IMG_3912', src: 'faces/IMG_3912.jpg' },
+    { id: 'IMG_3916', src: 'faces/IMG_3916.jpg' },
+    { id: 'IMG_3917', src: 'faces/IMG_3917.jpg' },
+    { id: 'IMG_3921', src: 'faces/IMG_3921.jpg' },
+    { id: 'IMG_3922', src: 'faces/IMG_3922.jpg' },
+    { id: 'IMG_3925', src: 'faces/IMG_3925.jpg' },
+    { id: 'IMG_3928', src: 'faces/IMG_3928.jpg' },
+    { id: 'IMG_3933', src: 'faces/IMG_3933.jpg' },
+    { id: 'IMG_3935', src: 'faces/IMG_3935.jpg' },
+    { id: 'IMG_3938', src: 'faces/IMG_3938.jpg' },
+    { id: 'IMG_3947', src: 'faces/IMG_3947.jpg' },
+    { id: 'IMG_3948', src: 'faces/IMG_3948.jpg' },
+    { id: 'IMG_3951', src: 'faces/IMG_3951.jpg' },
+    { id: 'IMG_3964', src: 'faces/IMG_3964.jpg' },
+    { id: 'IMG_3974', src: 'faces/IMG_3974.jpg' },
+    { id: 'IMG_3978', src: 'faces/IMG_3978.jpg' },
+    { id: 'PXL_20250905_091059128', src: 'faces/PXL_20250905_091059128.jpg' }
+  ];
+  const SAD = ['Ааааа...', 'Меня никто не любит 😢', 'Мне так плохо', 'Шмыг-шмыг', 'Ну почему я?', 'Всё ужасно'];
+  const THANKS = ['Мне супер!', 'Ура! 😄', 'Спасибо!', 'Полегчало!'];
+  const HEARTS = ['❤️', '💖', '💕', '💗', '💛', '✨'];
+
+  const $ = id => document.getElementById(id);
+  const field = $('field');
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+
+  let smiles = [], total = 0, happy = 0, punches = 0;
+
+  // Spawn points: a jittered grid sized for the screen, so smiles land on random
+  // spots without overlapping. Positions are stored as fractions of the field.
+  function spawnPoints(count) {
+    const w = field.clientWidth, h = field.clientHeight;
+    const cols = Math.max(2, Math.round(Math.sqrt(MAX_SMILES * w / h)));
+    const rows = Math.ceil(MAX_SMILES / cols);
+    const cells = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cells.push([c, r]);
+    cells.sort(() => Math.random() - .5);
+    return cells.slice(0, count).map(([c, r]) => ({
+      x: (c + rnd(.3, .7)) / cols * 100,
+      y: (r + rnd(.3, .7)) / rows * 100,
+    }));
+  }
+
+  function sizeFaces() {
+    const w = field.clientWidth, h = field.clientHeight;
+    const cols = Math.max(2, Math.round(Math.sqrt(MAX_SMILES * w / h)));
+    const rows = Math.ceil(MAX_SMILES / cols);
+    const s = Math.max(50, Math.min(120, Math.min(w / cols, h / rows) * .72));
+    field.style.setProperty('--s', s + 'px');
+  }
+
+  function faceHtml(src) {
+    return `<span class="face" aria-hidden="true">
+      <img class="photo" src="${src}" alt="" draggable="false">
+      <svg class="tears" viewBox="0 0 100 100">
+        <path class="tear a" d="M37 50 q-5 8 0 11 q5 -3 0 -11z"/>
+        <path class="tear b" d="M63 50 q-5 8 0 11 q5 -3 0 -11z"/>
+      </svg>
+    </span>`;
+  }
+
+  function shuffled(a) {
+    const b = a.slice();
+    for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; }
+    return b;
+  }
+
+  function heart(x, y) {
+    const h = document.createElement('div');
+    h.className = 'heart';
+    h.textContent = pick(HEARTS);
+    h.style.left = x + rnd(-30, 30) + 'px';
+    h.style.top = y + 'px';
+    h.style.fontSize = rnd(18, 34) + 'px';
+    h.style.animationDuration = rnd(1.2, 2.2) + 's';
+    document.body.appendChild(h);
+    setTimeout(() => h.remove(), 2400);
+  }
+
+  function render(smile) {
+    const { el, hits } = smile;
+    el.dataset.mood = hits;
+    el.disabled = hits >= HITS_TO_CHEER;
+    el.setAttribute('aria-label', `Ударов: ${hits} из ${HITS_TO_CHEER}`);
+    el.style.setProperty('--ring', FACE_COLORS[hits]);
+    el.querySelectorAll('.pips i').forEach((pip, i) => pip.classList.toggle('on', i < hits));
+    if (hits >= HITS_TO_CHEER) el.querySelector('.say').textContent = pick(THANKS);
+  }
+
+  function punch(smile) {
+    if (smile.busy || smile.hits >= HITS_TO_CHEER) return;
+    smile.busy = true;
+    smile.hits++;
+    punches++;
+    countPunch(smile);
+    const el = smile.el;
+    el.classList.remove('hit');
+    void el.offsetWidth; // restart the animation
+    el.classList.add('hit');
+    render(smile);
+    setTimeout(() => { el.classList.remove('hit'); smile.busy = false; }, HIT_MS);
+    if (smile.hits >= HITS_TO_CHEER) {
+      happy++;
+      $('count').textContent = happy;
+      const r = el.getBoundingClientRect();
+      for (let i = 0; i < 8; i++) setTimeout(() => heart(r.left + r.width / 2, r.top), i * 80);
+      if (happy === total) setTimeout(() => {
+        $('winText').textContent = `Развеселили всех (${total}), ударов понадобилось: ${punches} 💛`;
+        $('win').style.display = 'flex';
+      }, 900);
+    }
+  }
+
+  // ---- All-time punch stats ----
+  // Each browser is a "player" with its own counts. The Netlify function /api/punches stores
+  // every player's counts separately and returns the sum, so players never overwrite each other.
+  // If the function isn't reachable (e.g. index.html opened as a file) counts stay in this browser.
+  const API = '/api/punches';
+  const LOCAL_KEY = 'cheer-up-punches-v1';
+  const PLAYER_KEY = 'cheer-up-player';
+  const VALID = new Set(FACES.map(f => f.id));
+  let mine = {}, others = {}, mode = 'local', player = '';
+  let writing = false, dirty = false, flushTimer = 0;
+
+  const clean = obj => {
+    const out = {};
+    if (obj && typeof obj === 'object') for (const [k, v] of Object.entries(obj))
+      if (VALID.has(k) && Number.isFinite(v) && v > 0) out[k] = Math.min(Math.floor(v), 1e9);
+    return out;
+  };
+  const addInto = (a, b) => { for (const k in b) a[k] = (a[k] || 0) + b[k]; return a; };
+  const totalFor = id => (others[id] || 0) + (mine[id] || 0);
+
+  try {
+    player = localStorage.getItem(PLAYER_KEY) || '';
+    if (!/^[A-Za-z0-9-]{8,64}$/.test(player)) {
+      player = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + '-' + Math.random().toString(36).slice(2));
+      localStorage.setItem(PLAYER_KEY, player);
+    }
+    mine = clean(JSON.parse(localStorage.getItem(LOCAL_KEY)));
+  } catch {}
+
+  function showTally(smile, bump) {
+    const t = smile.el.querySelector('.tally');
+    const n = totalFor(smile.face.id);
+    t.textContent = n ? `👊 ${n.toLocaleString('ru-RU')}` : '';
+    if (bump) { t.classList.remove('bump'); void t.offsetWidth; t.classList.add('bump'); }
+  }
+  const refreshTallies = () => { smiles.forEach(s => showTally(s)); if ($('stats').classList.contains('open')) renderStats(); };
+
+  function countPunch(smile) {
+    mine[smile.face.id] = (mine[smile.face.id] || 0) + 1;
+    showTally(smile, true);
+    try { localStorage.setItem(LOCAL_KEY, JSON.stringify(mine)); } catch {}
+    dirty = true;
+    clearTimeout(flushTimer);
+    flushTimer = setTimeout(flush, 700); // one request per pause in punching
+  }
+
+  async function flush(keepalive) {
+    if (!dirty || writing || mode !== 'server') return;
+    dirty = false; writing = true;
+    try {
+      const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player, counts: mine }), keepalive: !!keepalive });
+      if (!r.ok) throw new Error(r.status);
+    } catch { dirty = true; }
+    writing = false;
+    if (dirty && !keepalive) flushTimer = setTimeout(flush, 3000);
+  }
+  addEventListener('pagehide', () => flush(true));
+
+  async function pull() {
+    const r = await fetch(`${API}?player=${encodeURIComponent(player)}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    const totals = clean(data.totals), serverMine = clean(data.mine);
+    for (const k in serverMine) if (serverMine[k] > (mine[k] || 0)) mine[k] = serverMine[k];
+    const o = {};
+    for (const k in totals) { const v = totals[k] - (serverMine[k] || 0); if (v > 0) o[k] = v; }
+    others = o;
+    if (Object.keys(mine).some(k => mine[k] !== (serverMine[k] || 0))) dirty = true;
+  }
+
+  function renderStats() {
+    const rows = FACES.map(f => ({ f, n: totalFor(f.id) })).sort((a, b) => b.n - a.n);
+    const medals = ['🥇', '🥈', '🥉'];
+    $('statsList').replaceChildren(...rows.map((r, i) => {
+      const li = document.createElement('li');
+      const place = document.createElement('span'); place.className = 'place'; place.textContent = r.n && medals[i] || (i + 1);
+      const img = document.createElement('img'); img.src = r.f.src; img.alt = '';
+      const n = document.createElement('span'); n.className = 'n'; n.textContent = '👊 ' + r.n.toLocaleString('ru-RU');
+      li.append(place, img, n);
+      return li;
+    }));
+    const all = rows.reduce((a, r) => a + r.n, 0);
+    $('statsNote').textContent = (mode === 'server' ? 'Все игроки вместе' : 'Только в этом браузере') + ` · всего ударов: ${all.toLocaleString('ru-RU')}`;
+  }
+  $('statsBtn').addEventListener('click', () => { renderStats(); $('stats').classList.add('open'); if (mode === 'server') pull().then(refreshTallies, () => {}); });
+  $('statsClose').addEventListener('click', () => $('stats').classList.remove('open'));
+  $('stats').addEventListener('click', e => { if (e.target.id === 'stats') $('stats').classList.remove('open'); });
+
+  async function connectStats() {
+    refreshTallies();
+    if (location.protocol === 'file:') return;
+    try { await pull(); } catch { return; }
+    mode = 'server';
+    refreshTallies();
+    flush();
+    // Pick up other players' punches every 15 s while the tab is visible.
+    setInterval(() => {
+      if (document.visibilityState === 'visible' && !writing) pull().then(() => { refreshTallies(); flush(); }, () => {});
+    }, 15000);
+  }
+  connectStats();
+
+  function start() {
+    $('win').style.display = 'none';
+    field.replaceChildren();
+    sizeFaces();
+    total = Math.min(FACES.length, Math.floor(rnd(MIN_SMILES, MAX_SMILES + 1)));
+    const photos = shuffled(FACES);
+    happy = punches = 0;
+    $('count').textContent = 0;
+    $('total').textContent = total;
+    smiles = spawnPoints(total).map((p, i) => {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'smile';
+      el.style.left = p.x + '%';
+      el.style.top = p.y + '%';
+      el.style.animationDelay = rnd(0, .4) + 's';
+      el.innerHTML = faceHtml(photos[i].src) +
+        '<span class="burst" aria-hidden="true">💥</span>' +
+        '<span class="say"></span><span class="pips" aria-hidden="true"><i></i><i></i><i></i></span><span class="tally"></span>';
+      const say = el.querySelector('.say');
+      say.textContent = pick(SAD);
+      say.style.animationDelay = rnd(0, 2) + 's';
+      el.querySelector('.face').style.animationDelay = rnd(0, 1) + 's';
+      const smile = { el, hits: 0, busy: false, face: photos[i] };
+      el.addEventListener('pointerdown', e => { e.preventDefault(); punch(smile); });
+      field.append(el);
+      render(smile);
+      showTally(smile);
+      say.textContent = pick(SAD); // render() only replaces the text once happy
+      return smile;
+    });
+  }
+
+  // Glove follows the mouse; on touch it appears where you tap and swings.
+  const glove = $('glove');
+  let hideTimer = 0;
+  const moveGlove = e => { glove.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`; };
+  addEventListener('pointermove', e => {
+    if (e.pointerType !== 'mouse') return;
+    moveGlove(e);
+    glove.classList.add('on');
+  });
+  document.addEventListener('pointerleave', () => glove.classList.remove('on'));
+  addEventListener('pointerdown', e => {
+    moveGlove(e);
+    glove.classList.add('on');
+    glove.classList.remove('jab');
+    void glove.offsetWidth; // restart the swing
+    glove.classList.add('jab');
+    clearTimeout(hideTimer);
+    if (e.pointerType !== 'mouse') hideTimer = setTimeout(() => glove.classList.remove('on'), 500);
+  }, true);
+
+  $('again').addEventListener('click', start);
+  $('restart').addEventListener('click', start);
+  addEventListener('resize', sizeFaces);
+  start();
+})();
+</script>
+</body>
+</html>
